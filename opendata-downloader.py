@@ -27,6 +27,11 @@ except ImportError as ie:
     print(ie)
     sys.exit(1)
 
+global dryRun
+global compressed
+dryRun = None
+compressed = False
+
 # custom stringFormatter with uppercase/lowercase functionality
 stringFormatter = ExtendedFormatter()
 supportedModels = {}
@@ -51,6 +56,9 @@ def getMostRecentModelTimestamp(waitTimeMinutes=360, modelIntervalHours=3):
     return modelTimestamp
 
 def downloadAndExtractBz2FileFromUrl( url , destFilePath=None, destFileName=None):
+    if dryRun:
+        log.info("dryrun: '{0}'".format(url))
+        return
     log.info("downloading file: '{0}'".format(url))
 
     if destFileName == "" or destFileName == None:
@@ -62,23 +70,47 @@ def downloadAndExtractBz2FileFromUrl( url , destFilePath=None, destFileName=None
 
     resource = urllib.request.urlopen(url)
     compressedData = resource.read()
-    binaryData = bz2.decompress(compressedData)
-    fullFilePath = os.path.join(destFilePath, destFileName)
+    if compressed:
+        binaryData = compressedData
+        fullFilePath = os.path.join(destFilePath, destFileName + '.bz2')
+    else:
+        binaryData = bz2.decompress(compressedData)
+        fullFilePath = os.path.join(destFilePath, destFileName)
+
     log.info("saving file as: '{0}'".format(fullFilePath))
     with open(fullFilePath, 'wb') as outfile:
         outfile.write(binaryData)
     log.info("Done.")
 
-def getGribFileUrl(model="icon-eu", grid=None, param="t_2m", timestep=0, timestamp=getMostRecentModelTimestamp(waitTimeMinutes=180, modelIntervalHours=12)):
+
+# icon-d2/grib/12/u/icon-d2_germany_regular-lat-lon_single-level_2020120312_000_2d_u.grib2.bz2'
+#  icon-d2/grib/12/u/icon-d2_germany_regular-lat-lon_model-level_2020120212_013_39_u.grib2.bz2
+# https://opendata.dwd.de/weather/nwp/icon-d2/grib/12/u/icon-d2_germany_regular-lat-lon_model-level_2020120212_013_39_u.grib2.bz2
+#                                                       icon-d2_germany_regular-lat-lon_model-level_2020120312_000_2d_u.grib2.bz2'
+#                                                       icon-d2_germany_regular-lat-lon_model-level_2020120312_000_42_u.grib2.bz2'
+#          "model-level":
+#          "https://opendata.dwd.de/weather/nwp/{model!L}/grib/{modelrun:>02d}/{param!L}/{model!L}_{scope}_{grid}_{levtype}_{timestamp:%Y%m%d}{modelrun:>02d}_{step:>03d}_{level:>02d}_{param!L}.grib2.bz2",
+
+def getGribFileUrl(model="icon-eu",
+                   grid=None,
+                   param="t_2m",
+                   timestep=0,
+                   timestamp=getMostRecentModelTimestamp(waitTimeMinutes=180, modelIntervalHours=12),
+                   levtype = "single-level",
+                   level=42):
     cfg = supportedModels[model]
-    levtype = "single-level"
     grid = "regular-lat-lon"
     if (grid is None) or (grid not in cfg["grids"]):
         grid = cfg["grids"][0]
-    url = cfg["pattern"]["single-level"]
+    url = cfg["pattern"][levtype]
     # pattern is something like this:
-    #  "https://opendata.dwd.de/weather/nwp/{model!l}/grib/{modelrun:>02d}/{param!l}/{model!l}_{scope}_{grid}_{levtype}_{timestamp:%Y%m%d}{modelrun:>02d}_{step:>03d}_{param!u}.grib2.bz2"
+    #  "https://opendata.dwd.de/weather/nwp/{model!l}/grib/{modelrun:>02d}/{param!l}
+    # /{model!l}_{scope}_{grid}_{levtype}_{timestamp:%Y%m%d}{modelrun:>02d}_{step:>03d}_{param!u}.grib2.bz2"
+    # level:
+    # {model!L}_{scope}_{grid}_{levtype}_{timestamp:%Y%m%d}{modelrun:>02d}_{step:>03d}_{level:>d}_{param!L}.grib2.bz2"
     # e.g. https://opendata.dwd.de/weather/nwp/icon/grib/09/t_2m/icon_global_icosahedral_single-level_2020062609_000_T_2M.grib2.bz2
+    #                                                     icon-d2_germany_regular-lat-lon_model-level_2020120312_000_00_v.grib2.bz2'
+    #                                                     icon-d2_germany_regular-lat-lon_model-level_2020120312_000_42_u.grib2
     return stringFormatter.format( url,
         model = cfg["model"],
         param = param,
@@ -87,17 +119,39 @@ def getGribFileUrl(model="icon-eu", grid=None, param="t_2m", timestep=0, timesta
         scope = cfg["scope"],
         levtype = levtype,
         timestamp = timestamp,
-        step = timestep)
+        step = timestep,
+        level=level)
 
-def downloadGribData( model="icon-eu", grid=None, param="t_2m", timestep=0, timestamp=getMostRecentModelTimestamp(), destFilePath=None, destFileName=None ):
-    dataUrl=getGribFileUrl(model=model, grid=None, param=param, timestep=timestep, timestamp=timestamp)#
+def downloadGribData( model="icon-eu",
+                     grid=None,
+                     param="t_2m",
+                     timestep=0,
+                     timestamp=getMostRecentModelTimestamp(),
+                     destFilePath=None,
+                     destFileName=None,
+                     level=0,
+                     levtype="single-level" ):
 
+    dataUrl=getGribFileUrl(model=model, grid=None, param=param, timestep=timestep, timestamp=timestamp, level=level, levtype=levtype)
     downloadAndExtractBz2FileFromUrl(dataUrl, destFilePath=destFilePath, destFileName=destFileName)
 
-def downloadGribDataSequence(model="icon-eu", grid=None, param="t_2m", minTimeStep=0, maxTimeStep=12, timestamp=getMostRecentModelTimestamp(), destFilePath=None ):
+def downloadGribDataSequence(model="icon-eu",
+                             grid=None,
+                             param="t_2m",
+                             minTimeStep=0,
+                             maxTimeStep=12,
+                             minModelLevel=0,
+                             maxModelLevel=0,
+                             levtype="single-level",
+                             timestamp=getMostRecentModelTimestamp(),
+                             destFilePath=None ):
     #download data from open data server for the next x steps
     for timestep in range(minTimeStep, maxTimeStep+1):
-        downloadGribData(model=model, grid=None, param=param, timestep=timestep, timestamp=timestamp, destFilePath=destFilePath)
+        for l in range(minModelLevel,maxModelLevel+1):
+            downloadGribData(model=model, grid=None, param=param, timestep=timestep,
+                             timestamp=timestamp, destFilePath=destFilePath,
+                             level=l,
+                             levtype=levtype)
 
 def formatDateIso8601(date):
     return date.replace(microsecond=0,tzinfo=timezone.utc).isoformat()
@@ -130,13 +184,29 @@ parser.add_argument('--get-latest-timestamp',
 
 
 # use it like this: --single-level-fields t_2m pmsl clch ...
-parser.add_argument('--single-level-fields', 
+parser.add_argument('--single-level-fields',
                     dest='params',
-                    nargs='+', 
+                    nargs='+',
                     metavar='shortName',
                     type=str,
-                    default=['t_2m'],
+                    default=None, #['t_2m'],
                     help='one or more single-level model fields that should be donwloaded, e.g. t_2m, tmax_2m, clch, pmsl, ...')
+
+# use it like this: --single-level-fields t_2m pmsl clch ...
+parser.add_argument('--model-level-fields',
+                    dest='level_params',
+                    nargs='+',
+                    metavar='shortName',
+                    type=str,
+                    default=None, #['t_2m'],
+                    help='one or more model-level fields that should be donwloaded, e.g. u, v, p, m, ...')
+
+parser.add_argument('--min-model-level', dest='minModelLevel', default=0, type=int,
+                    help='the minimum level number to download (default=0)')
+
+parser.add_argument('--max-model-level', dest='maxModelLevel', default=0, #90,
+                    type=int,
+                    help='the maximum level number to download (default=0)')
 
 parser.add_argument('--min-time-step', dest='minTimeStep', default=0, type=int,
                     help='the minimum forecast time step to download (default=0)')
@@ -153,6 +223,11 @@ parser.add_argument('--http-proxy', dest='proxy', metavar='proxy_name_or_ip:port
 parser.add_argument("-v", "--verbose", help="increase output verbosity",
                     action="store_const", dest="loglevel", const=log.INFO)
 
+parser.add_argument("-d", "--dry-run", help="only show debug output, do not download",
+                    action="store_true", dest="dryRun")
+
+parser.add_argument("-c", "--compressed", help="store as bz2 file (do not uncompress)",
+                    action="store_true", dest="compressed")
 """
 usage: opendata-downloader.py [-h] --model
                               {cosmo-d2,cosmo-d2-eps,icon,icon-eps,icon-eu,icon-eu-eps,icon-d2,icon-d2-eps}
@@ -200,11 +275,13 @@ if __name__ == "__main__":
         log.basicConfig(format=logformat, level=log.DEBUG) # verbose
     else:
         log.basicConfig(format=logformat, level=log.ERROR) # default
-    
 
+    dryRun = args.dryRun
+    compressed = args.compressed
+    
     if args.proxy:
         #configure proxy
-        configureHttpProxyForUrllib( proxySettings = {'http': args.proxy } ) 
+        configureHttpProxyForUrllib( proxySettings = {'http': args.proxy } )
 
     #add custom dialect for csv export
     csv.register_dialect('excel-semicolon', delimiter=';', quoting=csv.QUOTE_ALL, lineterminator='\r\n')
@@ -216,9 +293,36 @@ if __name__ == "__main__":
     modelIntervalHours = selectedModel["intervalHours"]
     latestTimestamp = getMostRecentModelTimestamp(waitTimeMinutes=openDataDeliveryOffsetMinutes, modelIntervalHours=modelIntervalHours)
 
-    #download data
-    for param in args.params:
-        downloadGribDataSequence(model=selectedModel["model"], grid=args.grid, param=param, minTimeStep=args.minTimeStep, maxTimeStep=args.maxTimeStep, timestamp=latestTimestamp, destFilePath=args.destFilePath )
-
     if args.getLatestTimestamp:
         print(getTimestampString(latestTimestamp))
+        sys.exit(0)
+
+    if args.params is None and args.level_params is None:
+        log.error("nothing to download. Specify either --single-level-fields <fields> or --model-level-fields <fields>")
+        sys.exit(1)
+
+    #download data
+    if args.params:
+        for param in args.params:
+            downloadGribDataSequence(model=selectedModel["model"],
+                                     grid=args.grid,
+                                     param=param,
+                                     minTimeStep=args.minTimeStep,
+                                     maxTimeStep=args.maxTimeStep,
+                                     timestamp=latestTimestamp,
+                                     levtype = "single-level",
+                                     destFilePath=args.destFilePath )
+    if args.level_params:
+        for param in args.level_params:
+            minModelLevel = args.minModelLevel if args.minModelLevel > 0 else selectedModel["minlevel"]
+            maxModelLevel = args.maxModelLevel if args.maxModelLevel > 0 else selectedModel["maxlevel"]
+            downloadGribDataSequence(model=selectedModel["model"],
+                                     grid=args.grid,
+                                     param=param,
+                                     minTimeStep=args.minTimeStep,
+                                     maxTimeStep=args.maxTimeStep,
+                                     timestamp=latestTimestamp,
+                                     minModelLevel=minModelLevel,
+                                     maxModelLevel=maxModelLevel,
+                                     levtype = "model-level",
+                                     destFilePath=args.destFilePath )
