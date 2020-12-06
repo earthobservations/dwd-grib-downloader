@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+path=/tmp
 path=/var/www/static.mah.priv.at/cors/gribs
 model=icon-d2
 extra=
@@ -14,7 +15,7 @@ time_invariant='hhl'
 # wieviele steps? 1 step = 1h  -> 4-20h
 min_level=1
 max_level=65
-max_step=27
+max_step=0
 
 
 latest_timestamp=`python3 opendata-downloader.py --get-latest-timestamp --model ${model}`
@@ -27,32 +28,20 @@ echo "start:" `date`
 mkdir -p ${gribdir}
 
 
-python3 opendata-downloader.py  --compressed  ${extra} \
-      --model ${model}  \
-      --grid  ${grid} \
-      --single-level-fields ${single_level}  \
-      --max-time-step ${max_step}  --directory ${gribdir}
-
-
-python3 opendata-downloader.py --compressed ${extra} \
-      --model ${model}  \
-      --grid  ${grid} \
-      --model-level-fields  ${model_level}  \
-      --max-time-step ${max_step}  \
-      --min-model-level ${min_level}  \
-      --max-model-level ${max_level}  \
-      --directory ${gribdir}
-
+#python3 opendata-downloader.py  --compressed  ${extra} \
+#      --model ${model}  \
+#      --grid  ${grid} \
+#      --single-level-fields ${single_level}  \
+#      --max-time-step ${max_step}  --directory ${gribdir}
+#
 
 python3 opendata-downloader.py --compressed ${extra} \
       --model ${model}  \
       --grid  ${grid} \
       --time-invariant-fields  ${time_invariant}  \
-      --max-time-step 0  \
+      --max-time-step ${max_step}  \
       --min-model-level ${min_level}  \
       --max-model-level ${max_level}  \
       --directory ${gribdir}
-
-
 
 echo "finish:" `date`
