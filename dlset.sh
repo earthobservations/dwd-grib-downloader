@@ -7,10 +7,11 @@ extra='-v'
 extra=
 grid=regular-lat-lon
 single_level='relhum_2m v_10m vmax_10m t_2m'
-model_level='u v w t p'
+model_level='u v w t p qv hhl'
+
 # multi-levels: 25-65
 # wieviele steps? 1 step = 1h  -> 4-20h
-min_level=25
+min_level=1
 max_level=65
 max_step=27
 
