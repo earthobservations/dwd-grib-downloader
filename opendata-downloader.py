@@ -201,6 +201,15 @@ parser.add_argument('--model-level-fields',
                     default=None, #['t_2m'],
                     help='one or more model-level fields that should be donwloaded, e.g. u, v, p, m, ...')
 
+# use it like this: --single-level-fields t_2m pmsl clch ...
+parser.add_argument('--time-invariant-fields',
+                    dest='time_invariant_params',
+                    nargs='+',
+                    metavar='shortName',
+                    type=str,
+                    default=None, #['t_2m'],
+                    help='one or more time invariant fields that should be donwloaded, e.g. hhl, ...')
+
 parser.add_argument('--min-model-level', dest='minModelLevel', default=0, type=int,
                     help='the minimum level number to download (default=0)')
 
@@ -297,7 +306,7 @@ if __name__ == "__main__":
         print(getTimestampString(latestTimestamp))
         sys.exit(0)
 
-    if args.params is None and args.level_params is None:
+    if args.params is None and args.level_params is None and args.time_invariant_params is None:
         log.error("nothing to download. Specify either --single-level-fields <fields> or --model-level-fields <fields>")
         sys.exit(1)
 
@@ -326,3 +335,21 @@ if __name__ == "__main__":
                                      maxModelLevel=maxModelLevel,
                                      levtype = "model-level",
                                      destFilePath=args.destFilePath )
+
+    if args.time_invariant_params:
+        for param in args.time_invariant_params:
+            minModelLevel = args.minModelLevel if args.minModelLevel > 0 else selectedModel["minlevel"]
+            maxModelLevel = args.maxModelLevel if args.maxModelLevel > 0 else selectedModel["maxlevel"]
+            downloadGribDataSequence(model=selectedModel["model"],
+                                     grid=args.grid,
+                                     param=param,
+                                     minTimeStep=args.minTimeStep,
+                                     maxTimeStep=args.maxTimeStep,
+                                     timestamp=latestTimestamp,
+                                     minModelLevel=minModelLevel,
+                                     maxModelLevel=maxModelLevel,
+                                     levtype = "time-invariant",
+                                     destFilePath=args.destFilePath )
+
+
+
