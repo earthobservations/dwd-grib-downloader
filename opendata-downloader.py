@@ -22,6 +22,9 @@ try:
     from datetime import datetime, timedelta, timezone
     import logging as log
     from extendedformatter import ExtendedFormatter
+    import concurrent.futures
+    from concurrent.futures.thread import ThreadPoolExecutor
+
 except ImportError as ie:
     print("required libraries could not be found:")
     print(ie)
@@ -30,6 +33,7 @@ except ImportError as ie:
 global dryRun
 global compressed
 global skipExisting
+global maxWorkers
 skipExisting = True
 dryRun = None
 compressed = False
@@ -54,7 +58,6 @@ def getMostRecentModelTimestamp(waitTimeMinutes=360, modelIntervalHours=3, model
     # explicit model run timestamp
     if modelrun:
         return datetime.strptime(modelrun, '%Y%m%d%H')
-
 
     # model data becomes available approx 1.5 hours (90minutes) after a model run
     # cosmo-d2 model and icon-eu run every 3 hours
@@ -87,7 +90,7 @@ def downloadAndExtractBz2FileFromUrl(url, destFilePath=None, destFileName=None):
     if skipExisting and os.path.exists(fullFilePath):
         log.info("skipping existing file: '{0}'".format(fullFilePath))
         return
-    
+
     resource = urllib.request.urlopen(url)
     compressedData = resource.read()
     if compressed:
@@ -152,33 +155,10 @@ def downloadGribData(model="icon-eu",
                      level=0,
                      levtype="single-level"):
 
-
-    dfp = destFilePath
-    cfg = supportedModels[model]
-    if "destpattern" in cfg:
-        pat = cfg["destpattern"]
-        # replicate DWD tree like https://opendata.dwd.de/weather/nwp/icon-d2/grib/00/t_2m/
-        subdir = stringFormatter.format(pat,
-                                        model=model,
-                                        param=param,
-                                        grid=grid,
-                                        modelrun=timestamp.hour,
-                                        levtype=levtype,
-                                        timestamp=timestamp,
-                                        step=timestep,
-                                        level=level)
-        dfp = os.path.join( destFilePath, subdir)
-    if not os.path.exists(dfp):
-        if dryRun:
-            log.debug(f"mdkir {dfp}")
-        else:
-            os.makedirs(dfp)
-
-    log.debug(f"destFilePath={dfp}")
     dataUrl = getGribFileUrl(model=model, grid=None, param=param,
                              timestep=timestep, timestamp=timestamp, level=level, levtype=levtype)
     downloadAndExtractBz2FileFromUrl(
-        dataUrl, destFilePath=dfp, destFileName=destFileName)
+        dataUrl, destFilePath=destFilePath, destFileName=destFileName)
 
 
 def downloadGribDataSequence(model="icon-eu",
@@ -191,13 +171,48 @@ def downloadGribDataSequence(model="icon-eu",
                              levtype="single-level",
                              timestamp=getMostRecentModelTimestamp(),
                              destFilePath=None):
+
+    dfp = destFilePath
+    cfg = supportedModels[model]
+    if "destpattern" in cfg:
+        pat = cfg["destpattern"]
+        # replicate DWD tree like https://opendata.dwd.de/weather/nwp/icon-d2/grib/00/t_2m/
+        subdir = stringFormatter.format(pat,
+                                        model=model,
+                                        param=param,
+                                        grid=grid,
+                                        modelrun=timestamp.hour,
+                                        levtype=levtype,
+                                        timestamp=timestamp)
+        # step=timestep,
+        # level=level)
+        dfp = os.path.join(destFilePath, subdir)
+    if not os.path.exists(dfp):
+        if dryRun:
+            log.debug(f"mdkir {dfp}")
+        else:
+            os.makedirs(dfp)
     # download data from open data server for the next x steps
-    for timestep in range(minTimeStep, maxTimeStep + 1):
-        for l in range(minModelLevel, maxModelLevel + 1):
-            downloadGribData(model=model, grid=None, param=param, timestep=timestep,
-                             timestamp=timestamp, destFilePath=destFilePath,
-                             level=l,
-                             levtype=levtype)
+    with ThreadPoolExecutor(max_workers=maxWorkers) as executor:
+        futures = []
+        for timestep in range(minTimeStep, maxTimeStep + 1):
+            for l in range(minModelLevel, maxModelLevel + 1):
+                futures.append(executor.submit(
+                    downloadGribData, model=model,
+                                    grid=None,
+                                    param=param,
+                                    timestep=timestep,
+                                    timestamp=timestamp,
+                                    destFilePath=dfp,
+                                    level=l,
+                                    levtype=levtype))
+
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                log.debug(future.result())
+            except:
+                log.error("Unexpected error:", sys.exc_info()[0])
+                raise
 
 
 def formatDateIso8601(date):
@@ -291,6 +306,11 @@ parser.add_argument("-c", "--compressed", help="store as bz2 file (do not uncomp
                     action="store_true", dest="compressed")
 parser.add_argument("-r", "--reload", help="reload files even if bz2 file exists - default to skipping existing files",
                     action="store_false", default=True, dest="skipexisting")
+
+parser.add_argument('--max-workers', dest='maxWorkers', default=20, type=int,
+                    help='number of thread workers for parallel download')
+
+
 """
 usage: opendata-downloader.py [-h] --model
                               {cosmo-d2,cosmo-d2-eps,icon,icon-eps,icon-eu,icon-eu-eps,icon-d2,icon-d2-eps}
@@ -342,6 +362,7 @@ if __name__ == "__main__":
     dryRun = args.dryRun
     compressed = args.compressed
     skipExisting = args.skipexisting
+    maxWorkers = args.maxWorkers
 
     if args.proxy:
         # configure proxy
