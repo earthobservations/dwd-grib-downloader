@@ -1,15 +1,27 @@
 #cdo  sellonlatbox parameter:
 # West+Oststeiermark
 BBOX=14.5,16.8,46,47.5
-
 #	not worth the effort: 58804 vs 47601
 # -z jpeg
 CDO_OPTS:=  --silent
-
 INDIR=next/gribs
 #icon-d2/2020120312/
 OUTDIR=next-resized
 #MERGE=next-resized/all.grib2
+
+# test
+#cdo  sellonlatbox parameter:
+# West+Oststeiermark
+BBOX=14.5,16.8,46,47.5
+#	not worth the effort: 58804 vs 47601
+# -z jpeg
+CDO_OPTS:=  --silent
+INDIR=test-downloader
+#icon-d2/2020120312/
+OUTDIR=test-downloader-resized
+#MERGE=next-resized/all.grib2
+
+
 
 STRUCTURE := $(shell find $(INDIR) -type d)
 STRUCTURE_NO_INDIR := $(STRUCTURE:$(INDIR)=)
