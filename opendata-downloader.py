@@ -47,10 +47,17 @@ def configureHttpProxyForUrllib(proxySettings={'http': 'proxyserver:8080'}):
     urllib.request.install_opener(opener)
 
 
-def getMostRecentModelTimestamp(waitTimeMinutes=360, modelIntervalHours=3):
+def getMostRecentModelTimestamp(waitTimeMinutes=360, modelIntervalHours=3, modelrun=None):
+
+    # explicit model run timestamp
+    if modelrun:
+        return datetime.strptime(modelrun, '%Y%m%d%H')
+
+
     # model data becomes available approx 1.5 hours (90minutes) after a model run
     # cosmo-d2 model and icon-eu run every 3 hours
     now = datetime.utcnow() - timedelta(minutes=waitTimeMinutes)
+
     latestAvailableUTCRun = int(math.floor(
         now.hour / modelIntervalHours) * modelIntervalHours)
     modelTimestamp = datetime(
@@ -260,6 +267,9 @@ parser.add_argument('--max-time-step', dest='maxTimeStep', default=-1, type=int,
 parser.add_argument('--directory', dest='destFilePath', default=os.getcwd(),
                     help='the download directory')
 
+parser.add_argument('--modelrun', dest='modelrun', default=None,
+                    help='explicitly download from a particular model run. Example: --modelrun 2020121212')
+
 parser.add_argument('--http-proxy', dest='proxy', metavar='proxy_name_or_ip:port', required=False,
                     help='the http proxy url and port')
 
@@ -336,7 +346,7 @@ if __name__ == "__main__":
     openDataDeliveryOffsetMinutes = selectedModel["openDataDeliveryOffsetMinutes"]
     modelIntervalHours = selectedModel["intervalHours"]
     latestTimestamp = getMostRecentModelTimestamp(
-        waitTimeMinutes=openDataDeliveryOffsetMinutes, modelIntervalHours=modelIntervalHours)
+        waitTimeMinutes=openDataDeliveryOffsetMinutes, modelIntervalHours=modelIntervalHours, modelrun=args.modelrun)
 
     if args.getLatestTimestamp:
         print(getTimestampString(latestTimestamp))
