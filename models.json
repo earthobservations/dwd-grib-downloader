@@ -62,6 +62,7 @@
          },
          "minlevel": 1,
          "maxlevel": 65,
+         "destpattern": "{model!L}/grib/{modelrun:>02d}/{param!L}",
         "openDataDeliveryOffsetMinutes": 90
     },
     {
