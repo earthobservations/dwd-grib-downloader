@@ -29,6 +29,8 @@ except ImportError as ie:
 
 global dryRun
 global compressed
+global skipExisting
+skipExisting = True
 dryRun = None
 compressed = False
 
@@ -78,14 +80,20 @@ def downloadAndExtractBz2FileFromUrl(url, destFilePath=None, destFileName=None):
     if destFilePath == "" or destFilePath == None:
         destFilePath = os.getcwd()
 
+    if compressed:
+        fullFilePath = os.path.join(destFilePath, destFileName + '.bz2')
+    else:
+        fullFilePath = os.path.join(destFilePath, destFileName)
+    if skipExisting and os.path.exists(fullFilePath):
+        log.info("skipping existing file: '{0}'".format(fullFilePath))
+        return
+    
     resource = urllib.request.urlopen(url)
     compressedData = resource.read()
     if compressed:
         binaryData = compressedData
-        fullFilePath = os.path.join(destFilePath, destFileName + '.bz2')
     else:
         binaryData = bz2.decompress(compressedData)
-        fullFilePath = os.path.join(destFilePath, destFileName)
 
     log.info("saving file as: '{0}'".format(fullFilePath))
     with open(fullFilePath, 'wb') as outfile:
@@ -281,6 +289,8 @@ parser.add_argument("-d", "--dry-run", help="only show debug output, do not down
 
 parser.add_argument("-c", "--compressed", help="store as bz2 file (do not uncompress)",
                     action="store_true", dest="compressed")
+parser.add_argument("-r", "--reload", help="reload files even if bz2 file exists - default to skipping existing files",
+                    action="store_false", default=True, dest="skipexisting")
 """
 usage: opendata-downloader.py [-h] --model
                               {cosmo-d2,cosmo-d2-eps,icon,icon-eps,icon-eu,icon-eu-eps,icon-d2,icon-d2-eps}
@@ -331,6 +341,7 @@ if __name__ == "__main__":
 
     dryRun = args.dryRun
     compressed = args.compressed
+    skipExisting = args.skipexisting
 
     if args.proxy:
         # configure proxy
