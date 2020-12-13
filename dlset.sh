@@ -27,8 +27,9 @@ max_step=1
 min_step=0
 extra='-v'
 path=test-downloader
+modelrun='--modelrun 2020121212'
 
-latest_timestamp=`python3 opendata-downloader.py --get-latest-timestamp --model ${model}`
+latest_timestamp=`python3 opendata-downloader.py --get-latest-timestamp --model ${model} ${modelrun}`
 
 gribdir=${path}/${latest_timestamp}
 
@@ -39,6 +40,7 @@ mkdir -p ${gribdir}
 
 if [ -n "$single_level" ]; then
   python3 opendata-downloader.py  --compressed  ${extra} \
+        ${modelrun} \
         --model ${model}  \
         --grid  ${grid} \
         --single-level-fields ${single_level}  \
@@ -49,6 +51,7 @@ fi
 
 if [ -n "$model_level" ]; then
   python3 opendata-downloader.py --compressed ${extra} \
+        ${modelrun} \
         --model ${model}  \
         --grid  ${grid} \
         --model-level-fields  ${model_level}  \
@@ -61,6 +64,7 @@ fi
 
 if [ -n "$time_invariant" ]; then
   python3 opendata-downloader.py --compressed ${extra} \
+        ${modelrun} \
         --model ${model}  \
         --grid  ${grid} \
         --time-invariant-fields  ${time_invariant}  \
