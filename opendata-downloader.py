@@ -130,10 +130,36 @@ def downloadGribData( model="icon-eu",
                      destFilePath=None,
                      destFileName=None,
                      level=0,
-                     levtype="single-level" ):
+                     levtype="single-level"):
 
-    dataUrl=getGribFileUrl(model=model, grid=None, param=param, timestep=timestep, timestamp=timestamp, level=level, levtype=levtype)
-    downloadAndExtractBz2FileFromUrl(dataUrl, destFilePath=destFilePath, destFileName=destFileName)
+
+    dfp = destFilePath
+    cfg = supportedModels[model]
+    if "destpattern" in cfg:
+        pat = cfg["destpattern"]
+        # replicate DWD tree like https://opendata.dwd.de/weather/nwp/icon-d2/grib/00/t_2m/
+        subdir = stringFormatter.format(pat,
+                                        model=model,
+                                        param=param,
+                                        grid=grid,
+                                        modelrun=timestamp.hour,
+                                        levtype=levtype,
+                                        timestamp=timestamp,
+                                        step=timestep,
+                                        level=level)
+        dfp = os.path.join( destFilePath, subdir)
+    if not os.path.exists(dfp):
+        if dryRun:
+            log.debug(f"mdkir {dfp}")
+        else:
+            os.makedirs(dfp)
+
+    log.debug(f"destFilePath={dfp}")
+    dataUrl = getGribFileUrl(model=model, grid=None, param=param,
+                             timestep=timestep, timestamp=timestamp, level=level, levtype=levtype)
+    downloadAndExtractBz2FileFromUrl(
+        dataUrl, destFilePath=dfp, destFileName=destFileName)
+
 
 def downloadGribDataSequence(model="icon-eu",
                              grid=None,
