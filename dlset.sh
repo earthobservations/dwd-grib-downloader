@@ -4,8 +4,8 @@ path=/var/www/static.mah.priv.at/cors/gribs
 path=/Users/mah/Ballon/src/downloader/testme
 model=icon-d2
 extra=
-extra='-v'
 extra='-v -d'
+extra='-v'
 
 # grid=regular-lat-lon
 # single_level='relhum_2m u_10m v_10m vmax_10m t_2m'
@@ -21,13 +21,14 @@ grid=regular-lat-lon
 single_level='vmax_10m'
 model_level='u v'
 time_invariant='hhl'
-min_level=60
+min_level=57
 max_level=62
-max_step=1
+max_step=5
 min_step=0
-extra='-v'
+extra='-v -d'
+extra=
 path=test-downloader
-modelrun='--modelrun 2020121212'
+#modelrun='--modelrun 2020121212'
 
 latest_timestamp=`python3 opendata-downloader.py --get-latest-timestamp --model ${model} ${modelrun}`
 
