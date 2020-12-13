@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 
 path=/var/www/static.mah.priv.at/cors/gribs
+#path=/Users/mah/Ballon/src/downloader/testme
 model=icon-d2
 extra=
-extra='-v -d'
 extra='-v'
+extra='-v -d'
+
 grid=regular-lat-lon
 single_level='relhum_2m u_10m v_10m vmax_10m t_2m'
 model_level='u v w t p qv'
@@ -19,7 +21,7 @@ max_step=27
 
 latest_timestamp=`python3 opendata-downloader.py --get-latest-timestamp --model ${model}`
 
-gribdir=${path}/${model}/${latest_timestamp}
+gribdir=${path}/${latest_timestamp} #/${model}
 
 echo "gribdir:" ${gribdir}
 echo "start:" `date`
