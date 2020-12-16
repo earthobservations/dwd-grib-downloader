@@ -1,0 +1,74 @@
+#cdo  sellonlatbox parameter:
+# West+Oststeiermark
+BBOX=14.5,16.8,46,47.5
+#	not worth the effort: 58804 vs 47601
+# -z jpeg
+CDO_OPTS:=  --silent
+INDIR=/var/www/static.mah.priv.at/cors/gribs
+OUTDIR=/var/www/static.mah.priv.at/cors/gribs-resized
+INDIR=/var/www/static.mah.priv.at/cors/gribs/2020121512
+OUTDIR=/var/www/static.mah.priv.at/cors/gribs-resized/2020121512
+
+
+STRUCTURE := $(shell find $(INDIR) -type d)
+STRUCTURE_NO_INDIR := $(STRUCTURE:$(INDIR)=)
+INGRIBS := $(shell find $(STRUCTURE) -name '*.grib2' -o -name '*.grib2.bz2')
+
+# the list of files below OUTDIR, without OUTDIR prefix
+INGRIBS_NO_INDIR := $(subst $(INDIR)/,,$(INGRIBS))
+
+TARGETS := $(subst .bz2,,$(addprefix ${OUTDIR}/, $(INGRIBS:${INDIR}/%=%)))
+NETCDF_TARGETS := $(subst .grib2.bz2,.nc,$(addprefix ${OUTDIR}/, $(INGRIBS:${INDIR}/%=%)))
+TARGET_DIRS := $(addprefix ${OUTDIR}/, $(sort $(dir $(INGRIBS_NO_INDIR))))
+
+CDO_NCCVT := --silent -f nc copy 
+
+STEPS := $(shell seq -f '%03.0f'  0 27)
+
+default: target_directories $(TARGETS)
+	$(info all up to date in $(OUTDIR))
+
+
+nc:	$(NETCDF_TARGETS)
+	echo done with nc conversion
+
+# steps:
+# ls next-resized/icon-d2/2020120312/|awk  '{split($0, a, "_"); print a[6]}'|sort|uniq
+# step sequence: seq -f '%03.0f'  0 27
+
+# merge: target_directories $(TARGETS)
+# 	rm -f $(MERGE)
+# 	$(foreach f,$(TARGETS),$(shell echo $(f); cdo -v cat $(f) $(MERGE)))
+
+#	@SKIP_SAME_TIME=1 cdo merge $(TARGETS) $(MERGE)
+
+
+# un-bzip2'd files
+$(OUTDIR)/%.grib2: $(addprefix $(INDIR)/,%.grib2)
+	@cdo  $(CDO_OPTS) sellonlatbox,$(BBOX) $<  $@
+
+# bzip2'd files
+$(OUTDIR)/%.grib2: $(addprefix $(INDIR)/,%.grib2.bz2)
+			@$(eval TMP := $(shell mktemp  /tmp/tmpgrib2.XXXXXX))
+			@bzip2 --keep --decompress --stdout $<  >$(TMP)
+			@cdo  $(CDO_OPTS) sellonlatbox,$(BBOX) $(TMP) $@
+			@rm -f $(TMP)
+
+# netcdf conversion
+$(OUTDIR)/%.nc: $(addprefix $(OUTDIR)/,%.grib2)
+			@cdo  $(CDO_NCCVT)  $(TMP) $< $@
+
+
+steps:
+		$(info $(STEPS))
+
+structure:
+	$(info  $(STRUCTURE))
+	$(info  $(STRUCTURE_NO_INDIR))
+
+clean:
+	@rm -rf $(OUTDIR)
+
+# ok below
+target_directories:
+	@mkdir -p $(TARGET_DIRS)
