@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+#set -x
 path=/var/www/static.mah.priv.at/cors/gribs
 path=/Users/mah/Ballon/src/downloader/testme
 model=icon-d2
@@ -21,11 +21,11 @@ grid=regular-lat-lon
 single_level='vmax_10m'
 model_level='u v'
 time_invariant='hhl'
-min_level=57
+min_level=60
 max_level=62
 max_step=5
 min_step=0
-extra='-v -d'
+extra='-v'
 extra=
 path=test-downloader
 #modelrun='--modelrun 2020121212'

@@ -184,8 +184,6 @@ def downloadGribDataSequence(model="icon-eu",
                                         modelrun=timestamp.hour,
                                         levtype=levtype,
                                         timestamp=timestamp)
-        # step=timestep,
-        # level=level)
         dfp = os.path.join(destFilePath, subdir)
     if not os.path.exists(dfp):
         if dryRun:
