@@ -52,7 +52,18 @@
         "scope": "germany",
         "intervalHours": 12,
         "grids": ["icosahedral", "regular-lat-lon"],
-        "pattern": {"single-level": "https://opendata.dwd.de/weather/nwp/{model!L}/grib/{modelrun:>02d}/{param!L}/{model!L}_{scope}_{grid}_{levtype}_{timestamp:%Y%m%d}{modelrun:>02d}_{step:>03d}_2d_{param!L}.grib2.bz2" },
+        "pattern": {
+          "single-level":
+          "https://opendata.dwd.de/weather/nwp/{model!L}/grib/{modelrun:>02d}/{param!L}/{model!L}_{scope}_{grid}_{levtype}_{timestamp:%Y%m%d}{modelrun:>02d}_{step:>03d}_2d_{param!L}.grib2.bz2",
+          "model-level":
+          "https://opendata.dwd.de/weather/nwp/{model!L}/grib/{modelrun:>02d}/{param!L}/{model!L}_{scope}_{grid}_{levtype}_{timestamp:%Y%m%d}{modelrun:>02d}_{step:>03d}_{level:>d}_{param!L}.grib2.bz2",
+          "pressure-level":
+          "https://opendata.dwd.de/weather/nwp/{model!L}/grib/{modelrun:>02d}/{param!L}/{model!L}_{scope}_{grid}_{levtype}_{timestamp:%Y%m%d}{modelrun:>02d}_{step:>03d}_{level}_{param!L}.grib2.bz2",
+          "time-invariant":
+          "https://opendata.dwd.de/weather/nwp/{model!L}/grib/{modelrun:>02d}/{param!L}/{model!L}_{scope}_{grid}_{levtype}_{timestamp:%Y%m%d}{modelrun:>02d}_{step:>03d}_{level:>d}_{param!L}.grib2.bz2"
+         },
+         "minlevel": 1,
+         "maxlevel": 65,
         "openDataDeliveryOffsetMinutes": 90
     },
     {
