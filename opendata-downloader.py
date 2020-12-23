@@ -3,9 +3,12 @@
 
  Script to download and extract grib files from DWD's open data file server https://opendata.dwd.de
 
- Author:
+ original Author:
     Eduard Rosert
+ extensive rewrite:
+    Michael Haberler
  Version history:
+    x.y, 2020-12-22, parallelize download, support model-level pressure-level time-invariant on some models
     0.2, 2019-10-17, added --get-latest-timestamp, --min-timestamp option
     0.1, 2019-10-01, initial version
 """
@@ -15,6 +18,7 @@ try:
     import sys
     import csv
     import urllib.request
+    from urllib.error import URLError, HTTPError
     import bz2
     import json
     import math
@@ -39,6 +43,8 @@ dryRun = None
 compressed = False
 retainDwdTree = True
 dwdPattern = "{model!L}/grib/{modelrun:>02d}/{param!L}"
+failedFiles = []
+
 
 # custom stringFormatter with uppercase/lowercase functionality
 stringFormatter = ExtendedFormatter()
@@ -93,17 +99,19 @@ def downloadAndExtractBz2FileFromUrl(url, destFilePath=None, destFileName=None):
         log.debug("skipping existing file: '{0}'".format(fullFilePath))
         return
 
-    resource = urllib.request.urlopen(url)
-    compressedData = resource.read()
-    if compressed:
-        binaryData = compressedData
-    else:
-        binaryData = bz2.decompress(compressedData)
+    try:
+        resource = urllib.request.urlopen(url)
+        compressedData = resource.read()
+        if compressed:
+            binaryData = compressedData
+        else:
+            binaryData = bz2.decompress(compressedData)
 
-    log.debug("saving file as: '{0}'".format(fullFilePath))
-    with open(fullFilePath, 'wb') as outfile:
-        outfile.write(binaryData)
-
+        log.debug("saving file as: '{0}'".format(fullFilePath))
+        with open(fullFilePath, 'wb') as outfile:
+            outfile.write(binaryData)
+    except HTTPError as e:
+        failedFiles.append((url, e.status, HTTPError))
 
 def getGribFileUrl(model="icon-eu",
                    grid=None,
@@ -152,6 +160,7 @@ def downloadGribData(model="icon-eu",
     downloadAndExtractBz2FileFromUrl(dataUrl,
                                      destFilePath=destFilePath,
                                      destFileName=destFileName)
+    return dataUrl
 
 
 def downloadGribDataSequence(model="icon-eu",
@@ -163,7 +172,6 @@ def downloadGribDataSequence(model="icon-eu",
                              levtype="single-level",
                              timestamp=getMostRecentModelTimestamp(),
                              destFilePath=None):
-
     dfp = destFilePath
     cfg = supportedModels[model]
     if not flat:
@@ -199,11 +207,7 @@ def downloadGribDataSequence(model="icon-eu",
                                                levtype=levtype))
 
         for future in concurrent.futures.as_completed(futures):
-            try:
-                log.debug(future.result())
-            except:
-                log.error("Unexpected error:", sys.exc_info()[0])
-                raise
+            log.debug(future.result())
 
 
 def formatDateIso8601(date):
@@ -297,7 +301,7 @@ parser.add_argument('--min-time-step',
 
 parser.add_argument('--max-time-step',
                     dest='maxTimeStep',
-                    default=-1,
+                    default=0,
                     type=int,
                     metavar='STEP',
                     help='the maximung forecast time step to download, e.g. 12 will download time steps from min-time-step - 12. If no max-time-step was defined, no data will be downloaded.')
@@ -474,3 +478,14 @@ if __name__ == "__main__":
                                  levelRange=[0],
                                  levtype="time-invariant",
                                  destFilePath=args.destFilePath)
+
+
+if failedFiles:
+    print(f"#the command line was: {sys.argv}", file=sys.stderr)
+    print("#the below URLs failed to download:", file=sys.stderr)
+
+for f in failedFiles:
+    exc, url, status = f
+    print(f"{exc} {url} {status}", file=sys.stderr)
+
+sys.exit(len(failedFiles))
