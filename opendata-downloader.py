@@ -30,8 +30,7 @@ try:
     from concurrent.futures.thread import ThreadPoolExecutor
 
 except ImportError as ie:
-    print("required libraries could not be found:")
-    print(ie)
+    log.exception("Importing required libraries failed")
     sys.exit(1)
 
 global dryRun
@@ -79,10 +78,12 @@ def getMostRecentModelTimestamp(waitTimeMinutes=360, modelIntervalHours=3, model
 
 
 def downloadAndExtractBz2FileFromUrl(url, destFilePath=None, destFileName=None):
+
     if dryRun:
-        log.info("dryrun: '{0}'".format(url))
+        log.debug("Pretending to download file: '{0}' (dry-run)".format(url))
         return
-    log.debug("downloading file: '{0}'".format(url))
+    else:
+        log.debug("Downloading file: '{0}'".format(url))
 
     if destFileName == "" or destFileName == None:
         # strip the filename from the url and remove the bz2 extension
@@ -96,8 +97,8 @@ def downloadAndExtractBz2FileFromUrl(url, destFilePath=None, destFileName=None):
     else:
         fullFilePath = os.path.join(destFilePath, destFileName)
     if skipExisting and os.path.exists(fullFilePath):
-        log.debug("skipping existing file: '{0}'".format(fullFilePath))
         return
+        log.debug("Skipping existing file: '{0}'".format(fullFilePath))
 
     try:
         resource = urllib.request.urlopen(url)
@@ -107,11 +108,14 @@ def downloadAndExtractBz2FileFromUrl(url, destFilePath=None, destFileName=None):
         else:
             binaryData = bz2.decompress(compressedData)
 
-        log.debug("saving file as: '{0}'".format(fullFilePath))
+        log.debug("Saving file as: '{0}'".format(fullFilePath))
         with open(fullFilePath, 'wb') as outfile:
             outfile.write(binaryData)
     except HTTPError as e:
+        log.error(f"Downloading failed. Reason={e}, URL={url}")
         failedFiles.append((url, e.status, HTTPError))
+    except Exception as e:
+        log.exception(f"Downloading failed. Reason={e}, URL={url}")
 
 def getGribFileUrl(model="icon-eu",
                    grid=None,
@@ -124,8 +128,11 @@ def getGribFileUrl(model="icon-eu",
                    level=42):
 
     cfg = supportedModels[model]
+
+    # When "grid" parameter is not given, use first available grid type.
     if (grid is None) or (grid not in cfg["grids"]):
         grid = cfg["grids"][0]
+
     url = cfg["pattern"][levtype]
     return stringFormatter.format(url,
                                   model=cfg["model"],
@@ -188,10 +195,11 @@ def downloadGribDataSequence(model="icon-eu",
 
     if not os.path.exists(dfp):
         if dryRun:
-            log.debug(f"mdkir {dfp}")
+            log.debug(f"Creating directory: {dfp}")
         else:
             os.makedirs(dfp)
 
+    log.info(f"Using {maxWorkers} workers for downloading")
     with ThreadPoolExecutor(max_workers=maxWorkers) as executor:
         futures = []
         for timestep in timeSteps:
@@ -207,7 +215,7 @@ def downloadGribDataSequence(model="icon-eu",
                                                levtype=levtype))
 
         for future in concurrent.futures.as_completed(futures):
-            log.debug(future.result())
+            log.debug("Result: {}".format(result))
 
 
 def formatDateIso8601(date):
@@ -416,6 +424,7 @@ if __name__ == "__main__":
         waitTimeMinutes=openDataDeliveryOffsetMinutes, modelIntervalHours=modelIntervalHours, modelrun=args.modelrun)
 
     if args.getLatestTimestamp:
+        log.info("Acquiring latest timestamp")
         print(getTimestampString(latestTimestamp))
         sys.exit(0)
 
