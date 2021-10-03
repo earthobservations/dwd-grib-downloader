@@ -97,8 +97,8 @@ def downloadAndExtractBz2FileFromUrl(url, destFilePath=None, destFileName=None):
     else:
         fullFilePath = os.path.join(destFilePath, destFileName)
     if skipExisting and os.path.exists(fullFilePath):
-        return
         log.debug("Skipping existing file: '{0}'".format(fullFilePath))
+        return fullFilePath
 
     try:
         resource = urllib.request.urlopen(url)
@@ -111,6 +111,7 @@ def downloadAndExtractBz2FileFromUrl(url, destFilePath=None, destFileName=None):
         log.debug("Saving file as: '{0}'".format(fullFilePath))
         with open(fullFilePath, 'wb') as outfile:
             outfile.write(binaryData)
+        return fullFilePath
     except HTTPError as e:
         log.error(f"Downloading failed. Reason={e}, URL={url}")
         failedFiles.append((url, e.status, HTTPError))
@@ -164,10 +165,10 @@ def downloadGribData(model="icon-eu",
                              level=level,
                              levtype=levtype)
 
-    downloadAndExtractBz2FileFromUrl(dataUrl,
+    output_file = downloadAndExtractBz2FileFromUrl(dataUrl,
                                      destFilePath=destFilePath,
                                      destFileName=destFileName)
-    return dataUrl
+    return {"url": dataUrl, "file": output_file}
 
 
 def downloadGribDataSequence(model="icon-eu",
@@ -200,6 +201,8 @@ def downloadGribDataSequence(model="icon-eu",
             os.makedirs(dfp)
 
     log.info(f"Using {maxWorkers} workers for downloading")
+
+    results = []
     with ThreadPoolExecutor(max_workers=maxWorkers) as executor:
         futures = []
         for timestep in timeSteps:
@@ -215,7 +218,11 @@ def downloadGribDataSequence(model="icon-eu",
                                                levtype=levtype))
 
         for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            results.append(result)
             log.debug("Result: {}".format(result))
+
+    return results
 
 
 def formatDateIso8601(date):
