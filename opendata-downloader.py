@@ -488,7 +488,7 @@ if __name__ == "__main__":
                                  levtype="time-invariant",
                                  destFilePath=args.destFilePath)
 
-
+"""
 if failedFiles:
     print(f"#the command line was: {sys.argv}", file=sys.stderr)
     print("#the below URLs failed to download:", file=sys.stderr)
@@ -498,3 +498,4 @@ for f in failedFiles:
     print(f"{exc} {url} {status}", file=sys.stderr)
 
 sys.exit(len(failedFiles))
+"""
