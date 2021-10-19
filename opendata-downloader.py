@@ -165,7 +165,6 @@ def downloadGribData(model="icon-eu",
                              level=level,
                              levtype=levtype)
 
-    log.info(f"Downloading {dataUrl}")
     output_file = downloadAndExtractBz2FileFromUrl(dataUrl,
                                      destFilePath=destFilePath,
                                      destFileName=destFileName)
